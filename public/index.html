@@ -72,7 +72,7 @@
                     <h3>Arquivos gerados:</h3>
                     <div>
                         ${data.arquivos.map(arquivo => `
-                            <a class="download-link" href="/download/${arquivo}">${arquivo}</a>
+                            <a class="download-link" href="/download/${arquivo.id}/${arquivo.nome}">${arquivo.nome}</a>
                         `).join('')}
                     </div>
                 `;

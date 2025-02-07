@@ -2,13 +2,11 @@ const express = require('express');
 const multer = require('multer');
 const XLSX = require('xlsx');
 const path = require('path');
-const session = require('express-session');
-const config = require('./config');
 
 const app = express();
 
-// Configuração da sessão
-app.use(session(config.session));
+// Armazenamento temporário em memória
+const arquivosTemporarios = new Map();
 
 // Configuração do Multer para memória
 const upload = multer({
@@ -49,6 +47,7 @@ app.post('/upload', upload.single('arquivo'), async (req, res) => {
         console.log('Total de linhas:', dados.length);
         const totalArquivos = Math.ceil(dados.length / LINHAS_POR_ARQUIVO);
         const arquivosGerados = [];
+        const sessionId = Date.now().toString(); // ID único para esta sessão
 
         // Processa cada parte
         for (let i = 0; i < totalArquivos; i++) {
@@ -65,19 +64,27 @@ app.post('/upload', upload.single('arquivo'), async (req, res) => {
             
             // Nome do arquivo
             const nomeArquivo = `${path.parse(req.file.originalname).name}_${i + 1}.xlsx`;
+            const fileId = `${sessionId}_${nomeArquivo}`;
+            
+            // Armazena o buffer com um ID único
+            arquivosTemporarios.set(fileId, buffer);
             arquivosGerados.push({
-                nome: nomeArquivo,
-                buffer: buffer
+                id: fileId,
+                nome: nomeArquivo
             });
         }
 
-        // Armazena os buffers na sessão
-        req.session.arquivos = arquivosGerados;
+        // Configura limpeza automática após 1 hora
+        setTimeout(() => {
+            arquivosGerados.forEach(arquivo => {
+                arquivosTemporarios.delete(arquivo.id);
+            });
+        }, 3600000); // 1 hora
 
-        // Retorna apenas os nomes dos arquivos
+        // Retorna os IDs e nomes dos arquivos
         res.json({
             success: true,
-            arquivos: arquivosGerados.map(a => a.nome),
+            arquivos: arquivosGerados,
             total: totalArquivos
         });
 
@@ -91,18 +98,18 @@ app.post('/upload', upload.single('arquivo'), async (req, res) => {
 });
 
 // Rota para download
-app.get('/download/:arquivo', (req, res) => {
+app.get('/download/:fileId/:nome', (req, res) => {
     try {
-        const nomeArquivo = req.params.arquivo;
-        const arquivo = req.session?.arquivos?.find(a => a.nome === nomeArquivo);
+        const { fileId, nome } = req.params;
+        const buffer = arquivosTemporarios.get(fileId);
 
-        if (!arquivo) {
+        if (!buffer) {
             return res.status(404).json({ error: 'Arquivo não encontrado' });
         }
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="${arquivo.nome}"`);
-        res.send(arquivo.buffer);
+        res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+        res.send(buffer);
 
     } catch (erro) {
         console.error('Erro no download:', erro);
