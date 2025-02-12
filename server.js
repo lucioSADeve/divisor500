@@ -27,10 +27,11 @@ const upload = multer({ storage: storage });
 app.use(express.static('public'));
 app.use('/downloads', express.static(path.join(__dirname, 'downloads')));
 
-// Criar diretórios necessários
+// Garantir que as pastas existem
 ['uploads', 'downloads'].forEach(dir => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+    const dirPath = path.join(__dirname, dir);
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
     }
 });
 
