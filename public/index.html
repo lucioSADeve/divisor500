@@ -6,54 +6,183 @@
     <title>Divisor de Excel</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Arial, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         .upload-area {
-            border: 2px dashed #ccc;
-            padding: 20px;
+            border: 2px dashed #3498db;
+            padding: 30px;
             text-align: center;
             margin: 20px 0;
-        }
-        .results {
-            margin-top: 20px;
-        }
-        .download-link {
-            display: block;
-            margin: 5px 0;
-            color: blue;
-            text-decoration: underline;
+            border-radius: 8px;
+            transition: all 0.3s ease;
             cursor: pointer;
+        }
+        .upload-area.dragover {
+            background-color: #ecf0f1;
+            border-color: #2980b9;
+        }
+        .upload-area h3 {
+            color: #555;
+            margin-bottom: 10px;
         }
         .loading {
             display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #eee;
+            border-radius: 10px;
+            overflow: hidden;
+            display: none;
+        }
+        .progress {
+            width: 0%;
+            height: 100%;
+            background-color: #3498db;
+            transition: width 0.3s ease;
+        }
+        .download-link {
+            display: block;
+            margin: 10px 0;
+            padding: 10px;
+            color: #3498db;
+            text-decoration: none;
+            border: 1px solid #3498db;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+        .download-link:hover {
+            background-color: #3498db;
+            color: white;
+        }
+        .error {
+            color: #e74c3c;
+            padding: 10px;
+            background-color: #fadbd8;
+            border-radius: 5px;
+        }
+        .file-info {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stat-card h4 {
+            margin: 0;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        .stat-card p {
+            margin: 5px 0 0;
+            font-size: 1.2em;
+            color: #2c3e50;
         }
     </style>
 </head>
 <body>
-    <h1>Divisor de Arquivos Excel</h1>
-    <div class="upload-area">
-        <h3>Arraste seu arquivo Excel ou clique para selecionar</h3>
-        <input type="file" id="fileInput" accept=".xlsx,.xls">
+    <div class="container">
+        <h1>Divisor de Arquivos Excel - Filtro de Domínios .com.br</h1>
+        <div class="upload-area" id="dropZone">
+            <h3>Arraste seu arquivo Excel ou clique para selecionar</h3>
+            <p>Formatos aceitos: .xlsx, .xls</p>
+            <p>O arquivo será filtrado para manter apenas domínios .com.br</p>
+            <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
+        </div>
+        <div class="loading">
+            <p>Processando arquivo...</p>
+            <div class="progress-bar">
+                <div class="progress"></div>
+            </div>
+        </div>
+        <div class="results"></div>
     </div>
-    <div class="loading">Processando arquivo...</div>
-    <div class="results"></div>
 
     <script>
+        const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
         const loading = document.querySelector('.loading');
         const results = document.querySelector('.results');
+        const progressBar = document.querySelector('.progress');
+        const progressContainer = document.querySelector('.progress-bar');
 
-        fileInput.addEventListener('change', async (e) => {
+        // Adiciona suporte para drag and drop
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.remove('dragover');
+            });
+        });
+
+        dropZone.addEventListener('drop', handleDrop);
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const file = dt.files[0];
+            handleFile(file);
+        }
+
+        function handleFileSelect(e) {
             const file = e.target.files[0];
+            handleFile(file);
+        }
+
+        async function handleFile(file) {
             if (!file) return;
+
+            // Validação do tipo de arquivo
+            if (!file.name.match(/\.(xlsx|xls)$/i)) {
+                results.innerHTML = `<div class="error">Erro: Por favor, selecione apenas arquivos Excel (.xlsx ou .xls)</div>`;
+                return;
+            }
 
             const formData = new FormData();
             formData.append('arquivo', file);
 
             loading.style.display = 'block';
+            progressContainer.style.display = 'block';
             results.innerHTML = '';
 
             try {
@@ -68,20 +197,43 @@
                     throw new Error(data.error);
                 }
 
+                // Exibe estatísticas do processamento
                 results.innerHTML = `
+                    <div class="file-info">
+                        <h3>Resultado do Processamento</h3>
+                        <div class="stats">
+                            <div class="stat-card">
+                                <h4>Total de Registros</h4>
+                                <p>${data.totalRegistros}</p>
+                            </div>
+                            <div class="stat-card">
+                                <h4>Domínios .com.br</h4>
+                                <p>${data.dominiosComBr}</p>
+                            </div>
+                            <div class="stat-card">
+                                <h4>Arquivos Gerados</h4>
+                                <p>${data.arquivos.length}</p>
+                            </div>
+                        </div>
+                    </div>
                     <h3>Arquivos gerados:</h3>
                     <div>
                         ${data.arquivos.map(arquivo => `
-                            <a class="download-link" href="/download/${arquivo.id}/${arquivo.nome}">${arquivo.nome}</a>
+                            <a class="download-link" href="/download/${arquivo.id}/${arquivo.nome}">
+                                📄 ${arquivo.nome} 
+                                <small>(${arquivo.registros} registros)</small>
+                            </a>
                         `).join('')}
                     </div>
                 `;
             } catch (erro) {
-                results.innerHTML = `<p style="color: red">Erro: ${erro.message}</p>`;
+                results.innerHTML = `<div class="error">Erro: ${erro.message}</div>`;
             } finally {
                 loading.style.display = 'none';
+                progressContainer.style.display = 'none';
+                progressBar.style.width = '0%';
             }
-        });
+        }
     </script>
 </body>
 </html>
