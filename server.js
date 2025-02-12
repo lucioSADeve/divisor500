@@ -49,41 +49,45 @@ app.post('/upload', upload.single('arquivo'), async (req, res) => {
             );
         });
 
-        // Definir tamanho exato de cada arquivo
+        // Tamanho fixo de 500 registros por arquivo
         const REGISTROS_POR_ARQUIVO = 500;
         const arquivosGerados = [];
-        
-        // Calcular número total de arquivos necessários
-        const totalArquivos = Math.ceil(dominiosComBr.length / REGISTROS_POR_ARQUIVO);
 
-        // Dividir em arquivos de exatamente 500 registros
-        for (let i = 0; i < totalArquivos; i++) {
-            const inicio = i * REGISTROS_POR_ARQUIVO;
-            const fim = Math.min(inicio + REGISTROS_POR_ARQUIVO, dominiosComBr.length);
-            const chunk = dominiosComBr.slice(inicio, fim);
+        // Dividir os dados em chunks de 500
+        let parteAtual = 1;
+        for (let i = 0; i < dominiosComBr.length; i += REGISTROS_POR_ARQUIVO) {
+            // Pegar exatamente 500 registros ou o restante disponível
+            const registrosAtuais = dominiosComBr.slice(i, i + REGISTROS_POR_ARQUIVO);
+            
+            // Criar novo arquivo Excel
+            const novoWorkbook = XLSX.utils.book_new();
+            const novaWorksheet = XLSX.utils.json_to_sheet(registrosAtuais);
+            XLSX.utils.book_append_sheet(novoWorkbook, novaWorksheet, 'Sheet1');
 
-            const newWorkbook = XLSX.utils.book_new();
-            const newWorksheet = XLSX.utils.json_to_sheet(chunk);
-            XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, 'Sheet1');
+            // Nome do arquivo com número da parte
+            const nomeArquivo = `parte_${parteAtual}_${registrosAtuais.length}_registros.xlsx`;
+            const caminhoArquivo = path.join(__dirname, 'downloads', nomeArquivo);
 
-            const fileName = `dominios_comBr_parte_${i + 1}_de_${totalArquivos}.xlsx`;
-            const filePath = path.join(__dirname, 'downloads', fileName);
+            // Salvar arquivo
+            XLSX.writeFile(novoWorkbook, caminhoArquivo);
 
-            XLSX.writeFile(newWorkbook, filePath);
-
-            console.log(`Arquivo ${i + 1} criado com ${chunk.length} registros`); // Log para debug
-
+            // Registrar informações do arquivo
             arquivosGerados.push({
-                id: i + 1,
-                nome: fileName,
-                registros: chunk.length
+                id: parteAtual,
+                nome: nomeArquivo,
+                registros: registrosAtuais.length
             });
+
+            // Log para debug
+            console.log(`Criado arquivo ${nomeArquivo} com ${registrosAtuais.length} registros`);
+            
+            parteAtual++;
         }
 
         // Limpar arquivo de upload
         fs.unlinkSync(req.file.path);
 
-        // Enviar resposta
+        // Enviar resposta com estatísticas
         res.json({
             totalRegistros: data.length,
             dominiosComBr: dominiosComBr.length,
