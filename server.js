@@ -42,6 +42,8 @@ app.post('/upload', upload.single('arquivo'), async (req, res) => {
         const worksheet = workbook.Sheets[sheetName];
         const data = XLSX.utils.sheet_to_json(worksheet);
 
+        console.log('Total de registros lidos:', data.length);
+
         // Filtrar domínios .com.br
         const dominiosComBr = data.filter(row => {
             return Object.values(row).some(value => 
@@ -49,51 +51,53 @@ app.post('/upload', upload.single('arquivo'), async (req, res) => {
             );
         });
 
-        // Configuração fixa de 500 registros
+        console.log('Total de domínios .com.br:', dominiosComBr.length);
+
+        // Dividir em grupos de exatamente 500 registros
         const REGISTROS_POR_ARQUIVO = 500;
         const arquivosGerados = [];
+        let numeroArquivo = 1;
 
-        // Dividir em grupos de 500
-        const grupos = [];
+        // Processar em lotes de 500
         for (let i = 0; i < dominiosComBr.length; i += REGISTROS_POR_ARQUIVO) {
-            grupos.push(dominiosComBr.slice(i, i + REGISTROS_POR_ARQUIVO));
-        }
-
-        // Criar um arquivo para cada grupo
-        for (let i = 0; i < grupos.length; i++) {
-            const grupo = grupos[i];
+            const registrosDoArquivo = dominiosComBr.slice(i, i + REGISTROS_POR_ARQUIVO);
             
-            // Criar novo workbook para este grupo
+            // Criar novo arquivo Excel
             const novoWorkbook = XLSX.utils.book_new();
-            const novaWorksheet = XLSX.utils.json_to_sheet(grupo);
+            const novaWorksheet = XLSX.utils.json_to_sheet(registrosDoArquivo);
             XLSX.utils.book_append_sheet(novoWorkbook, novaWorksheet, 'Sheet1');
 
-            // Nome do arquivo com número de registros
-            const nomeArquivo = `parte_${i + 1}_de_${grupos.length}_${grupo.length}_registros.xlsx`;
+            // Nome do arquivo mais descritivo
+            const nomeArquivo = `dominio_comBr_${numeroArquivo}_${registrosDoArquivo.length}_registros.xlsx`;
             const caminhoArquivo = path.join(__dirname, 'downloads', nomeArquivo);
 
             // Salvar arquivo
             XLSX.writeFile(novoWorkbook, caminhoArquivo);
 
-            // Adicionar às informações de arquivos gerados
+            console.log(`Criado arquivo ${nomeArquivo} com ${registrosDoArquivo.length} registros`);
+
+            // Adicionar informações do arquivo
             arquivosGerados.push({
-                id: i + 1,
+                id: numeroArquivo,
                 nome: nomeArquivo,
-                registros: grupo.length
+                registros: registrosDoArquivo.length
             });
 
-            console.log(`Arquivo ${i + 1} criado com ${grupo.length} registros`);
+            numeroArquivo++;
         }
 
         // Limpar arquivo de upload
         fs.unlinkSync(req.file.path);
 
-        // Retornar informações completas
-        res.json({
+        // Enviar resposta com todas as informações
+        const resposta = {
             totalRegistros: data.length,
             dominiosComBr: dominiosComBr.length,
             arquivos: arquivosGerados
-        });
+        };
+
+        console.log('Resposta enviada:', resposta);
+        res.json(resposta);
 
     } catch (error) {
         console.error('Erro:', error);
