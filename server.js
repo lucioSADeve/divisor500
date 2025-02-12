@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // Configuração do Multer para upload de arquivos
 const storage = multer.diskStorage({
@@ -27,11 +27,14 @@ const upload = multer({ storage: storage });
 app.use(express.static('public'));
 app.use('/downloads', express.static(path.join(__dirname, 'downloads')));
 
-// Garantir que as pastas existem
-['uploads', 'downloads'].forEach(dir => {
-    const dirPath = path.join(__dirname, dir);
-    if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
+// Configurar diretórios
+const tmpDir = path.join(process.env.VERCEL ? '/tmp' : __dirname, 'uploads');
+const downloadsDir = path.join(process.env.VERCEL ? '/tmp' : __dirname, 'downloads');
+
+// Criar diretórios necessários
+[tmpDir, downloadsDir].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
     }
 });
 
@@ -131,7 +134,11 @@ app.get('/download/:id/:nome', (req, res) => {
     }
 });
 
-app.listen(port, () => {
-    console.log(`Servidor rodando em http://localhost:${port}`);
-    console.log(`Diretório atual: ${__dirname}`);
-}); 
+// Iniciar servidor apenas se não estiver no Vercel
+if (!process.env.VERCEL) {
+    app.listen(port, () => {
+        console.log(`Servidor rodando em http://localhost:${port}`);
+    });
+}
+
+module.exports = app; 
