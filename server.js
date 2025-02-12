@@ -57,9 +57,13 @@ app.post('/upload', upload.single('arquivo'), async (req, res) => {
         const REGISTROS_POR_ARQUIVO = 500;
         const arquivosGerados = [];
 
+        // Adicionar um log para debug
+        console.log(`Dividindo ${dominiosComBr.length} registros em grupos de ${REGISTROS_POR_ARQUIVO}`);
+
         // Dividir e criar novos arquivos
         for (let i = 0; i < dominiosComBr.length; i += REGISTROS_POR_ARQUIVO) {
             const chunk = dominiosComBr.slice(i, i + REGISTROS_POR_ARQUIVO);
+            console.log(`Criando arquivo com ${chunk.length} registros`); // Log adicional
             const newWorkbook = XLSX.utils.book_new();
             const newWorksheet = XLSX.utils.json_to_sheet(chunk);
             XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, 'Sheet1');
