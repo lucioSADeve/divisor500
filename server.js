@@ -49,45 +49,46 @@ app.post('/upload', upload.single('arquivo'), async (req, res) => {
             );
         });
 
-        // Tamanho fixo de 500 registros por arquivo
+        // Configuração fixa de 500 registros
         const REGISTROS_POR_ARQUIVO = 500;
         const arquivosGerados = [];
 
-        // Dividir os dados em chunks de 500
-        let parteAtual = 1;
+        // Dividir em grupos de 500
+        const grupos = [];
         for (let i = 0; i < dominiosComBr.length; i += REGISTROS_POR_ARQUIVO) {
-            // Pegar exatamente 500 registros ou o restante disponível
-            const registrosAtuais = dominiosComBr.slice(i, i + REGISTROS_POR_ARQUIVO);
+            grupos.push(dominiosComBr.slice(i, i + REGISTROS_POR_ARQUIVO));
+        }
+
+        // Criar um arquivo para cada grupo
+        for (let i = 0; i < grupos.length; i++) {
+            const grupo = grupos[i];
             
-            // Criar novo arquivo Excel
+            // Criar novo workbook para este grupo
             const novoWorkbook = XLSX.utils.book_new();
-            const novaWorksheet = XLSX.utils.json_to_sheet(registrosAtuais);
+            const novaWorksheet = XLSX.utils.json_to_sheet(grupo);
             XLSX.utils.book_append_sheet(novoWorkbook, novaWorksheet, 'Sheet1');
 
-            // Nome do arquivo com número da parte
-            const nomeArquivo = `parte_${parteAtual}_${registrosAtuais.length}_registros.xlsx`;
+            // Nome do arquivo com número de registros
+            const nomeArquivo = `parte_${i + 1}_de_${grupos.length}_${grupo.length}_registros.xlsx`;
             const caminhoArquivo = path.join(__dirname, 'downloads', nomeArquivo);
 
             // Salvar arquivo
             XLSX.writeFile(novoWorkbook, caminhoArquivo);
 
-            // Registrar informações do arquivo
+            // Adicionar às informações de arquivos gerados
             arquivosGerados.push({
-                id: parteAtual,
+                id: i + 1,
                 nome: nomeArquivo,
-                registros: registrosAtuais.length
+                registros: grupo.length
             });
 
-            // Log para debug
-            console.log(`Criado arquivo ${nomeArquivo} com ${registrosAtuais.length} registros`);
-            
-            parteAtual++;
+            console.log(`Arquivo ${i + 1} criado com ${grupo.length} registros`);
         }
 
         // Limpar arquivo de upload
         fs.unlinkSync(req.file.path);
 
-        // Enviar resposta com estatísticas
+        // Retornar informações completas
         res.json({
             totalRegistros: data.length,
             dominiosComBr: dominiosComBr.length,
