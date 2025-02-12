@@ -44,39 +44,37 @@ app.post('/upload', upload.single('arquivo'), async (req, res) => {
 
         // Filtrar domínios .com.br
         const dominiosComBr = data.filter(row => {
-            // Verifica todas as colunas possíveis para encontrar domínios .com.br
             return Object.values(row).some(value => 
                 String(value).toLowerCase().includes('.com.br')
             );
         });
 
-        console.log(`Total de registros: ${data.length}`);
-        console.log(`Registros .com.br encontrados: ${dominiosComBr.length}`);
-
-        // Configuração para divisão dos arquivos
+        // Definir tamanho exato de cada arquivo
         const REGISTROS_POR_ARQUIVO = 500;
         const arquivosGerados = [];
+        
+        // Calcular número total de arquivos necessários
+        const totalArquivos = Math.ceil(dominiosComBr.length / REGISTROS_POR_ARQUIVO);
 
-        // Adicionar um log para debug
-        console.log(`Dividindo ${dominiosComBr.length} registros em grupos de ${REGISTROS_POR_ARQUIVO}`);
+        // Dividir em arquivos de exatamente 500 registros
+        for (let i = 0; i < totalArquivos; i++) {
+            const inicio = i * REGISTROS_POR_ARQUIVO;
+            const fim = Math.min(inicio + REGISTROS_POR_ARQUIVO, dominiosComBr.length);
+            const chunk = dominiosComBr.slice(inicio, fim);
 
-        // Dividir e criar novos arquivos
-        for (let i = 0; i < dominiosComBr.length; i += REGISTROS_POR_ARQUIVO) {
-            const chunk = dominiosComBr.slice(i, i + REGISTROS_POR_ARQUIVO);
-            console.log(`Criando arquivo com ${chunk.length} registros`); // Log adicional
             const newWorkbook = XLSX.utils.book_new();
             const newWorksheet = XLSX.utils.json_to_sheet(chunk);
             XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, 'Sheet1');
 
-            const fileName = `dominios_comBr_parte_${Math.floor(i/REGISTROS_POR_ARQUIVO) + 1}.xlsx`;
+            const fileName = `dominios_comBr_parte_${i + 1}_de_${totalArquivos}.xlsx`;
             const filePath = path.join(__dirname, 'downloads', fileName);
 
             XLSX.writeFile(newWorkbook, filePath);
 
-            console.log(`Arquivo gerado: ${fileName}`);
+            console.log(`Arquivo ${i + 1} criado com ${chunk.length} registros`); // Log para debug
 
             arquivosGerados.push({
-                id: Math.floor(i/REGISTROS_POR_ARQUIVO) + 1,
+                id: i + 1,
                 nome: fileName,
                 registros: chunk.length
             });
@@ -94,7 +92,12 @@ app.post('/upload', upload.single('arquivo'), async (req, res) => {
 
     } catch (error) {
         console.error('Erro:', error);
-        res.status(500).json({ error: 'Erro ao processar o arquivo: ' + error.message });
+        res.status(500).json({ 
+            error: 'Erro ao processar o arquivo: ' + error.message,
+            totalRegistros: 0,
+            dominiosComBr: 0,
+            arquivos: []
+        });
     }
 });
 
