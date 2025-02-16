@@ -57,12 +57,12 @@ app.post('/upload', upload.single('arquivo'), async (req, res) => {
             );
         });
 
-        // Dividir em grupos de 500
-        const REGISTROS_POR_ARQUIVO = 500;
+        // Alterar de 500 para 100 registros por arquivo
+        const REGISTROS_POR_ARQUIVO = 100;
         const arquivosGerados = [];
         let numeroArquivo = 1;
 
-        // Processar em lotes de 500
+        // Processar em lotes de 100
         for (let i = 0; i < dominiosComBr.length; i += REGISTROS_POR_ARQUIVO) {
             const registrosDoArquivo = dominiosComBr.slice(i, i + REGISTROS_POR_ARQUIVO);
             
